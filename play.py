@@ -1,13 +1,32 @@
-# This is XOR
-
-
 import numpy as np
 
-momentum_rate = 0.9
-learning_rate = 0.1
+with open("in.txt", "r") as f:
+    raw_input = []
+    for line in f:
+        raw_input.append( map(int, line.split()) )
+input = np.asarray(raw_input)
+io_pairs = input.shape[0]
+
+with open("out.txt", "r") as f:
+    raw_output = []
+    for line in f:
+        raw_output.append( map(int, line.split()) )
+output = np.asarray(raw_output)
+
+
+f = open("param.txt", "r")
+lines = f.readlines()
+input_layer_n = int(lines[0].rstrip('\n'))
+hidden_layer_n = int(lines[1].rstrip('\n'))
+output_layer_n = int(lines[2].rstrip('\n'))
+learning_rate = float(lines[3].rstrip('\n'))
+momentum_rate = float(lines[4].rstrip('\n'))
+error_criterion  = float(lines[5].rstrip('\n'))
+
+f.close()
+
 epochs = 3000
 
-error_criterion = 0.02
 
 def sigmoid_function(x):
     return 1/(1 + np.exp(-x))
@@ -16,43 +35,12 @@ def sigmoid_derivate(x):
     return x * (1 - x)
 
 
-'''
-Params.txt includes:
-input n
-hidden n
-output n
-learning constant
-momentum constant
-learning/error criterion
-'''
 
-# Input needs to be loaded in from in.text
-input = np.array([
-    [1, 1],
-    [1, 0],
-    [0, 1],
-    [0, 0]
-    ]
-)
-# output needs to be loaded in from output.text
-output = np.array([
-    [0],
-    [1],
-    [1],
-    [0]
-])
-
-
-input_layer_n = input.shape[1]
-hidden_layer_n = 2
-output_layer_n = output.shape[1]
-
-io_pairs = input.shape[0]
 
 
 number_solved = 0
 total_epochs = 0
-for a in range(50):
+for a in range(1):
     # Initialise the hidden layer
     hidden_layer_weights = np.random.uniform(size=(input_layer_n, hidden_layer_n))
     hidden_layer_bias = np.random.uniform(size=(1, hidden_layer_n))
@@ -64,7 +52,7 @@ for a in range(50):
     prev_output_weight_change = 0
     prev_output_bias_change = 0
     prev_hidden_weight_change = 0
-    prev_hidden_bias_change = 0;
+    prev_hidden_bias_change = 0
     for i in range(epochs):
 
         #Feed Forward
