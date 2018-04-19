@@ -1,20 +1,39 @@
+import argparse
 import numpy as np
 
-with open("in.txt", "r") as f:
+input_args = argparse.ArgumentParser()
+input_args.add_argument('--folder', '-f', help="Folder of input files, for quick switching between models", type=str)
+input_args.add_argument('--epochs', '-e', help="Number of Epochs. Defaults to 3000", type= int, default= 3000)
+arguments =  input_args.parse_args()
+
+'''
+Each different type of models input files are put within a folder,
+You can pass in a folder agrument to the script, if no folder argument is
+passed in, then the input files are grabbed from the current folder.
+'''
+input_filename = "in.txt"
+output_filename = "out.txt"
+param_filename = "param.txt"
+
+if(arguments.folder):
+    input_filename = sys.argv[1] + "/" + input_filename
+    output_filename = sys.argv[1] + "/" + output_filename
+    param_filename = sys.argv[1] + "/" + param_filename
+
+with open(input_filename, "r") as f:
     raw_input = []
     for line in f:
         raw_input.append( map(int, line.split()) )
 input = np.asarray(raw_input)
 io_pairs = input.shape[0]
 
-with open("out.txt", "r") as f:
+with open(output_filename, "r") as f:
     raw_output = []
     for line in f:
         raw_output.append( map(int, line.split()) )
 output = np.asarray(raw_output)
 
-
-f = open("param.txt", "r")
+f = open(param_filename, "r")
 lines = f.readlines()
 input_layer_n = int(lines[0].rstrip('\n'))
 hidden_layer_n = int(lines[1].rstrip('\n'))
@@ -22,10 +41,14 @@ output_layer_n = int(lines[2].rstrip('\n'))
 learning_rate = float(lines[3].rstrip('\n'))
 momentum_rate = float(lines[4].rstrip('\n'))
 error_criterion  = float(lines[5].rstrip('\n'))
-
 f.close()
 
-epochs = 3000
+'''
+You can pass in a second argument to change the epoch count 
+otherwise this defaults to 3000
+'''
+epochs = arguments.epochs
+    
 
 
 def sigmoid_function(x):
@@ -114,6 +137,6 @@ for a in range(1):
         print(model_output)
 
 
-
-print("Solved %d out of %d, average epochs required for solution: %f" % (number_solved, a + 1, total_epochs/number_solved))
+if(number_solved > 0):
+    print("Solved %d out of %d, average epochs required for solution: %f" % (number_solved, a + 1, total_epochs/number_solved))
     
