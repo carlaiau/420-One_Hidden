@@ -117,10 +117,10 @@ class One_Hidden:
 
         # Number of I/O samples (Used for population error calc)
         self.io_pairs = self.input.shape[0]
+        self.total_training_population_error = 0
         if(folder == "6_iris"):
             self.test_io_pairs = self.test_input.shape[0]
-            self.total_training_population_error = 0
-            self.total_test_population_error = 0;
+            self.total_test_population_error = 0
             
         # Define Parameters
         f = open(param_filename, "r")
@@ -175,12 +175,12 @@ class One_Hidden:
             output_layer_input = hidden_layer_activation.dot(self.output_layer_weights) + self.output_layer_bias
 
             if self.output_action == "n": # Sine
-                model_output =  sine_function(output_layer_input)          
+                self.model_output =  sine_function(output_layer_input)          
             else: # Sigmoid
-                model_output =  sigmoid_function(output_layer_input)
+                self.model_output =  sigmoid_function(output_layer_input)
 
             #Determine Error
-            error = self.output - model_output
+            error = self.output - self.model_output
             population_error = 0.5 * np.sum( error**2 ) / (self.output_layer_n * self.io_pairs)
                 
             # Backpropogate
@@ -196,10 +196,10 @@ class One_Hidden:
                 else: # Sigmoid
                     hidden_layer_gradient = sigmoid_derivate(hidden_layer_activation)
 
-                if self.output_action == "n": # Cosine
-                    output_layer_gradient = cosine_function(model_output)
+                if self.output_action == "n": # Sine
+                    output_layer_gradient = cosine_function(self.model_output)
                 else: # Sigmoid
-                    output_layer_gradient = sigmoid_derivate(model_output)
+                    output_layer_gradient = sigmoid_derivate(self.model_output)
 
 
                 output_layer_delta = error * output_layer_gradient
@@ -241,7 +241,7 @@ class One_Hidden:
             print("Not solved over %d epochs" % epochs)
 
 
-    def bulk_learning(self, epochs = 5000, folder =""):
+    def bulk_learning(self, epochs = 10000, folder =""):
         solved = False
         total_epochs = 0
         total_solved = 0
@@ -264,13 +264,13 @@ class One_Hidden:
                 
                 output_layer_input = hidden_layer_activation.dot(self.output_layer_weights) + self.output_layer_bias
 
-                if self.output_action == "n": # Cosine
-                    model_output =  sine_function(output_layer_input)   
+                if self.output_action == "n": # Sine
+                    self.model_output =  sine_function(output_layer_input)   
                 else: # Sigmoid
-                    model_output =  sigmoid_function(output_layer_input)
+                    self.model_output =  sigmoid_function(output_layer_input)
                 
                 #Determine Error
-                error = self.output - model_output
+                error = self.output - self.model_output
                 population_error = 0.5 * np.sum( error**2 ) / (self.output_layer_n * self.io_pairs)
                     
                 # Backpropogate
@@ -287,9 +287,9 @@ class One_Hidden:
                         hidden_layer_gradient = sigmoid_derivate(hidden_layer_activation)
                     
                     if self.output_action == "n": # Sine
-                        output_layer_gradient = cosine_derivate(model_output)
+                        output_layer_gradient = cosine_function(self.model_output)
                     else: # Sigmoid
-                        output_layer_gradient = sigmoid_derivate(model_output)                        
+                        output_layer_gradient = sigmoid_derivate(self.model_output)                        
                     
                     output_layer_delta = error * output_layer_gradient
                     hidden_layer_error = output_layer_delta.dot(self.output_layer_weights.T)
@@ -323,9 +323,10 @@ class One_Hidden:
                     total_solved += 1;
                     total_epochs += e + 1;
                     print("Solved @ %d" % e)
+                    self.total_training_population_error += population_error
                     if(folder == "6_iris"):
                         self.test_model()
-                        self.total_training_population_error += population_error
+                        
                     break
 
             self.reset_weights()    
@@ -335,8 +336,10 @@ class One_Hidden:
         print("Total Solved: %d, average epochs to find solution: %d" % (total_solved, total_epochs/total_solved))
         print("Average Training Error")
         print(self.total_training_population_error / total_solved)
-        print("Average Test Error")
-        print(self.total_test_population_error / total_solved)
+        if(folder == "6_iris"):
+            print("Average Test Error")
+            print(self.total_test_population_error / total_solved)
+        
                         
     def print_weights(self):
         print("\nHidden Layer Weights")
@@ -430,7 +433,6 @@ class One_Hidden:
             hidden_layer_activation = sigmoid_function(hidden_layer_input)
         
         output_layer_input = hidden_layer_activation.dot(self.output_layer_weights) + self.output_layer_bias
-        
         if self.output_action == "n": # Sine
             test_model_output =  sine_function(output_layer_input)   
         else: # Sigmoid
@@ -440,7 +442,7 @@ class One_Hidden:
         error = self.test_output - test_model_output
         population_error = 0.5 * np.sum( error**2 ) / (self.output_layer_n * self.test_io_pairs)
         self.total_test_population_error += population_error
-        print("Population Error")
+        print("Test Population Error")
         print(population_error)
         
 
