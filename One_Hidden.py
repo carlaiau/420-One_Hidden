@@ -1,4 +1,5 @@
 import sys
+
 import numpy as np
 np.set_printoptions(suppress=True)
 
@@ -26,30 +27,29 @@ def relu_derivative(x, a):
 
 
 class One_Hidden:
-    # Constructor 
-    def __init__(self, folder="", hidden_action="s", output_action="s"):
+
+    def __init__(self, folder="", hidden_action="s", output_action="s", generalisation="n"):
         '''
         Each different type of models input files are put within a folder,
         You can pass in a folder agrument to the script, if no folder argument is
         passed in, then the input files are grabbed from the current folder.
         '''
-        input_filename = "in.txt"
-        output_filename = "out.txt"
+        self.generalisation = generalisation
+        self.input_filename = "in.txt"
+        self.output_filename = "out.txt"
         param_filename = "param.txt"
         if(folder != ""):
-            input_filename = folder.strip('/') + "/" + input_filename
-            output_filename = folder.strip('/') + "/" + output_filename
+            self.input_filename = folder.strip('/') + "/" + self.input_filename
+            self.output_filename = folder.strip('/') + "/" + self.output_filename
             param_filename = folder.strip('/') + "/" +  param_filename
 
-
-        with open(input_filename, "r") as f:
-            
+        with open(self.input_filename, "r") as f:    
             '''
             Split Iris into training and test set
             first determine the number of samples, then grab 80% of these 
             randomly as the training set, and the other 20% as the test
             '''
-            if(folder == "6_iris"):
+            if(generalisation == "y"):
                 full_doc = f.readlines()
                 indexs = np.arange(len(full_doc))
                 np.random.shuffle(indexs)
@@ -72,7 +72,7 @@ class One_Hidden:
                         test_input.append( map(int, full_doc[i].split()) )
                 self.input = np.asarray(training_input)
                 self.test_input = np.asarray(test_input)
-            
+
             else: # This ain't Iris, we don't need to worry about testing for generalisation 
                 raw_input = []
                 for line in f:
@@ -82,12 +82,13 @@ class One_Hidden:
                         raw_input.append( map(int, line.split()) )
                 self.input = np.asarray(raw_input)
 
-        with open(output_filename, "r") as f:
+
+        with open(self.output_filename, "r") as f:
 
             '''
             Also split the output into test and training, using the same random indexs
             '''
-            if(folder == "6_iris"):
+            if(self.generalisation == "y"):
                 full_doc = f.readlines()
                 training_output = []
                 test_output = []
@@ -104,8 +105,7 @@ class One_Hidden:
                     else:
                         test_output.append( map(int, full_doc[i].split()) )
                 self.output = np.asarray(training_output)
-                self.test_output = np.asarray(test_output)
-            
+                self.test_output = np.asarray(test_output)     
             else:
                 raw_output = []
                 for line in f:
@@ -118,10 +118,11 @@ class One_Hidden:
         # Number of I/O samples (Used for population error calc)
         self.io_pairs = self.input.shape[0]
         self.total_training_population_error = 0
-        if(folder == "6_iris"):
+        if(self.generalisation == "y"):
             self.test_io_pairs = self.test_input.shape[0]
             self.total_test_population_error = 0
-            
+            self.all_solved_test_population_errors = []
+
         # Define Parameters
         f = open(param_filename, "r")
         lines = f.readlines()
@@ -150,102 +151,12 @@ class One_Hidden:
         print(output_action)
         self.epochs = 0
 
-    def learn(self, epochs = 5000):
-        solved = False
-        epochs = int(epochs)
-        for e in range(epochs):
-            #Feed Forward
-            hidden_layer_input = self.input.dot(self.hidden_layer_weights) + self.hidden_layer_bias
-            
-            if self.hidden_action == "r": # Relu
-                hidden_layer_activation = relu_function(hidden_layer_input, 0)                
 
-            elif self.hidden_action == "l": # Leaky Relu
-                hidden_layer_activation = relu_function(hidden_layer_input, 0.01)
-
-            elif self.hidden_action == "v": # Very Leaky Relu
-                hidden_layer_activation = relu_function(hidden_layer_input, 0.1)
-
-            elif self.hidden_action == "n": # Sine
-                hidden_layer_activation = sine_function(hidden_layer_input)
-            
-            else: # Sigmoid
-                hidden_layer_activation = sigmoid_function(hidden_layer_input)
-
-            output_layer_input = hidden_layer_activation.dot(self.output_layer_weights) + self.output_layer_bias
-
-            if self.output_action == "n": # Sine
-                self.model_output =  sine_function(output_layer_input)          
-            else: # Sigmoid
-                self.model_output =  sigmoid_function(output_layer_input)
-
-            #Determine Error
-            error = self.output - self.model_output
-            population_error = 0.5 * np.sum( error**2 ) / (self.output_layer_n * self.io_pairs)
-                
-            # Backpropogate
-            if(population_error > self.error_criterion):
-                if self.hidden_action == "r": # Relu
-                    hidden_layer_gradient = relu_derivative(hidden_layer_activation, 0)
-                elif self.hidden_action == "l": # Leaky Relu
-                    hidden_layer_gradient = relu_derivative(hidden_layer_activation, 0.01)
-                elif self.hidden_action == "v": # Very Leaky Relu
-                    hidden_layer_gradient = relu_derivative(hidden_layer_activation, 0.1)
-                elif self.hidden_action == "n": # Sine
-                    hidden_layer_gradient = cosine_function(hidden_layer_activation)
-                else: # Sigmoid
-                    hidden_layer_gradient = sigmoid_derivate(hidden_layer_activation)
-
-                if self.output_action == "n": # Sine
-                    output_layer_gradient = cosine_function(self.model_output)
-                else: # Sigmoid
-                    output_layer_gradient = sigmoid_derivate(self.model_output)
-
-
-                output_layer_delta = error * output_layer_gradient
-                hidden_layer_error = output_layer_delta.dot(self.output_layer_weights.T)
-                hidden_layer_delta = hidden_layer_error * hidden_layer_gradient
-                    
-                # Update Weights
-                output_weight_change = hidden_layer_activation.T.dot(output_layer_delta) * self.learning_rate
-                output_weight_change += self.prev_output_weight_change * self.momentum_rate
-                self.output_layer_weights += output_weight_change
-
-                output_bias_change = np.sum(output_layer_delta, axis=0, keepdims=True) * self.learning_rate
-                output_bias_change += self.prev_output_bias_change * self.momentum_rate
-                self.output_layer_bias += output_bias_change
-
-                hidden_weight_change = self.input.T.dot(hidden_layer_delta) * self.learning_rate
-                hidden_weight_change += self.prev_hidden_weight_change * self.momentum_rate
-                self.hidden_layer_weights += hidden_weight_change
-
-                hidden_bias_change = np.sum(hidden_layer_delta, axis=0, keepdims=True) * self.learning_rate
-                hidden_bias_change += self.prev_hidden_bias_change * self.momentum_rate
-                self.hidden_layer_bias += hidden_bias_change
-
-                # Remember n-1 for momentum
-                self.prev_output_weight_change = output_weight_change
-                self.prev_output_bias_change =  output_bias_change
-                self.prev_hidden_weight_change = hidden_weight_change
-                self.prev_hidden_bias_change = hidden_bias_change
-            else:
-                # Solution found
-                solved = True
-                print("Error Criterion reached at epoch: %d" % (self.epochs + e + 1)  )
-                print("Final Training Population Error was %f" % population_error)
-                self.epochs = 0 
-                break
-
-        if not solved:
-            self.epochs += epochs
-            print("Not solved over %d epochs" % epochs)
-
-
-    def bulk_learning(self, epochs = 10000, folder =""):
+    def learn(self, iterations = 1000, epochs = 10000):
         solved = False
         total_epochs = 0
         total_solved = 0
-        for i in range(1000):
+        for i in range(iterations):
             for e in range(epochs):
 
                 #Feed Forward
@@ -256,7 +167,7 @@ class One_Hidden:
                 elif self.hidden_action == "l": # Leaky Relu
                     hidden_layer_activation = relu_function(hidden_layer_input, 0.01)
                 elif self.hidden_action == "v": # Very Leaky Relu
-                    hidden_layer_activation = relu_function(hidden_layer_input, 0.1)
+                    hidden_layer_activation = relu_function(hidden_layer_input, 0.15)
                 elif self.hidden_action == "n": # Sine
                     hidden_layer_activation = sine_function(hidden_layer_input) 
                 else: # Sigmoid
@@ -280,7 +191,7 @@ class One_Hidden:
                     elif self.hidden_action == "l": # Leaky Relu
                         hidden_layer_gradient = relu_derivative(hidden_layer_activation, 0.01)
                     elif self.hidden_action == "v": # Very Leaky Relu
-                        hidden_layer_gradient = relu_derivative(hidden_layer_activation, 0.1)
+                        hidden_layer_gradient = relu_derivative(hidden_layer_activation, 0.15)
                     elif self.hidden_action == "n": # Sine
                         hidden_layer_gradient = cosine_function(hidden_layer_activation)
                     else: # Sigmoid
@@ -320,25 +231,46 @@ class One_Hidden:
                 else:
                     # Solution found
                     solved = True
-                    total_solved += 1;
-                    total_epochs += e + 1;
-                    print("Solved @ %d" % e)
-                    self.total_training_population_error += population_error
-                    if(folder == "6_iris"):
-                        self.test_model()
-                        
+                    if(iterations > 1):
+                        total_solved += 1
+                        total_epochs += e + 1
+                        print("Solved @ %d" % e)
+                        self.total_training_population_error += population_error
+                        if(self.generalisation == "y"):
+                            self.test_model(bulk = True)
+                    else:
+                        print("Error Criterion reached at epoch: %d" % (self.epochs + e + 1)  )
+                        print("Final Training Population Error was %f" % population_error)
+                        self.epochs = 0 
                     break
+            if iterations > 1:
+                self.reset_weights()    
+                if self.generalisation == "y":
+                    self.reset_sample()
 
-            self.reset_weights()    
-            if(folder == "6_iris"):
-                self.reset_sample()
+        
+        if(iterations > 1):
+            print("\nTotal Solved: %d, average epochs to find solution: %d" % (total_solved, total_epochs/total_solved))
+            print("Average Training Error")
+            print(self.total_training_population_error / total_solved)
+            if(self.generalisation == "y"):
+                print("Average Test Error")
+                average_population_error = self.total_test_population_error / total_solved
+                print(average_population_error)
+
+                # Calculate and output variance
+                # Minus mean from every sample
+                self.all_solved_test_population_errors[:] = [ (x - average_population_error)**2 for x in self.all_solved_test_population_errors]
+                std_dev = np.sqrt(sum(self.all_solved_test_population_errors) / (total_solved - 1))
+                print("Test Standard Deviation")
+                print(std_dev)
+
+        elif not solved:
+            self.epochs += epochs
+            print("Not solved over %d epochs" % epochs)
+        
             
-        print("Total Solved: %d, average epochs to find solution: %d" % (total_solved, total_epochs/total_solved))
-        print("Average Training Error")
-        print(self.total_training_population_error / total_solved)
-        if(folder == "6_iris"):
-            print("Average Test Error")
-            print(self.total_test_population_error / total_solved)
+
         
                         
     def print_weights(self):
@@ -375,7 +307,7 @@ class One_Hidden:
     the testing of generalisation, only applicable on the iris set
     '''
     def reset_sample(self):
-        with open("6_iris/in.txt", "r") as f:
+        with open(self.input_filename, "r") as f:
             full_doc = f.readlines()
             indexs = np.arange(len(full_doc))
             np.random.shuffle(indexs)
@@ -397,7 +329,7 @@ class One_Hidden:
             self.input = np.asarray(training_input)
             self.test_input = np.asarray(test_input)
         
-        with open("6_iris/out.txt", "r") as f:
+        with open(self.output_filename, "r") as f:
                 full_doc = f.readlines()
                 training_output = []
                 test_output = []
@@ -416,9 +348,7 @@ class One_Hidden:
                 self.test_output = np.asarray(test_output)
 
 
-
-
-    def test_model(self):
+    def test_model(self, bulk = False):
         hidden_layer_input = self.test_input.dot(self.hidden_layer_weights) + self.hidden_layer_bias
         
         if self.hidden_action == "r": # Relu
@@ -426,7 +356,7 @@ class One_Hidden:
         elif self.hidden_action == "l": # Leaky Relu
             hidden_layer_activation = relu_function(hidden_layer_input, 0.01)
         elif self.hidden_action == "v": # Very Leaky Relu
-            hidden_layer_activation = relu_function(hidden_layer_input, 0.1)
+            hidden_layer_activation = relu_function(hidden_layer_input, 0.15)
         elif self.hidden_action == "n": # Cosine
             hidden_layer_activation = sine_function(hidden_layer_input)    
         else: # Sigmoid
@@ -442,8 +372,14 @@ class One_Hidden:
         error = self.test_output - test_model_output
         population_error = 0.5 * np.sum( error**2 ) / (self.output_layer_n * self.test_io_pairs)
         self.total_test_population_error += population_error
+        if(not bulk):
+            print("Model Output")
+            print(test_model_output)
+        
         print("Test Population Error")
         print(population_error)
+
+        self.all_solved_test_population_errors.append(population_error)
         
 
 
@@ -453,13 +389,15 @@ if __name__== "__main__":
     "s: Sigmoid\n"
     "r: Relu\n"
     "l: Leaky Relu 0.01\n"
-    "v: Leaky Relu 0.1\n"
+    "v: Leaky Relu 0.15a (This is our optimal)\n"
     "n: Sine\n\n")
     output_activation = raw_input("\nPlease choose the output layer activation function\n"
-    "s: Sigmoid\n"
+    "s: Sigmoid (This)\n"
     "n: Sine\n\n")
-    
-    one_h = One_Hidden(folder, hidden_activation, output_activation)
+
+    generalisation = raw_input("\nDoes this model need to generalise (80:20 Training:Test)\n"
+    "y\nn\n\n")
+    one_h = One_Hidden(folder, hidden_activation, output_activation, generalisation)
 
     print("\nModel Initalised")
     option = 10
@@ -469,11 +407,11 @@ if __name__== "__main__":
                 "\nPlease choose option\n" 
                 "1: Teach (100 epochs)\n"
                 "2: Teach (to criteria)\n" 
-                "3: Test (only applicable to Iris set)\n" 
+                "3: Test (Iris will test generalisation on the 20% of unseen test data)\n" 
                 "4: Show weights\n"
                 "5: Show Output\n"
                 "6: Reset weights\n"
-                "carl: bulk iterations\n"
+                "7: bulk iterations\n"
                 "0: Quit\n\n"
             )
             if(option == "0"):
@@ -481,10 +419,10 @@ if __name__== "__main__":
                 break
             
             if(option == "1"):
-                one_h.learn(epochs = 10)
+                one_h.learn(iterations = 1, epochs = 100)
             
             if(option == "2"):
-                one_h.learn()
+                one_h.learn(iterations = 1, epochs = 5000)
             
             if(option == "3"):
                 if(folder == "6_iris"):
@@ -501,8 +439,26 @@ if __name__== "__main__":
             if(option == "6"):
                 one_h.reset_weights()
 
-            if(option == "carl"):
-                one_h.bulk_learning(epochs=500,folder=folder)
+            if(option == "7"):
+                try:
+                    in_iterations = raw_input("\nhow Many iterations? Leave blank for default of 1000\n");
+                except ValueError:
+                    in_iterations = 1000
+                else:
+                    if(in_iterations == ''):
+                        in_iterations = 1000
+                    else:
+                        in_iterations = int(in_iterations)
+                try:
+                    in_epochs = raw_input("\nhow Many Epochs? Leave blank for default of default of 5000\n");
+                except ValueError:
+                    in_epochs = 5000
+                else:
+                    if(in_epochs == ''):
+                        in_epochs = 5000
+                    else:
+                        in_epochs = int(in_epochs)    
+                one_h.learn(iterations =  in_iterations, epochs = in_epochs)
                 
         except EOFError:
             print ("Thanks for playing!")
