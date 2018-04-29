@@ -1,9 +1,11 @@
 import sys
-
 import numpy as np
-np.set_printoptions(suppress=True)
+np.set_printoptions(suppress=True) # Prevented Sci Notation as it was annoying
 
-
+'''
+All the functions that are used for feeding forward along with their derivative 
+counter parts for back propogation 
+'''
 def sigmoid_function(x):
     return 1/(1 + np.exp(-x))
 
@@ -28,7 +30,11 @@ def relu_derivative(x, a):
 
 class One_Hidden:
 
-    def __init__(self, folder="", hidden_action="s", output_action="s", generalisation="n"):
+    '''
+    The Initalisation of the object.
+    This is where all of the variables input into the UI build the inital state of the model
+    '''
+    def __init__(self, folder="", hidden_action="s", output_action="s", generalisation= False):
         '''
         Each different type of models input files are put within a folder,
         You can pass in a folder agrument to the script, if no folder argument is
@@ -44,12 +50,13 @@ class One_Hidden:
             param_filename = folder.strip('/') + "/" +  param_filename
 
         with open(self.input_filename, "r") as f:    
+            
             '''
             Split Iris into training and test set
             first determine the number of samples, then grab 80% of these 
             randomly as the training set, and the other 20% as the test
             '''
-            if(generalisation == "y"):
+            if self.generalisation:
                 full_doc = f.readlines()
                 indexs = np.arange(len(full_doc))
                 np.random.shuffle(indexs)
@@ -73,7 +80,7 @@ class One_Hidden:
                 self.input = np.asarray(training_input)
                 self.test_input = np.asarray(test_input)
 
-            else: # This ain't Iris, we don't need to worry about testing for generalisation 
+            else: # This isn't a generalisation set we don't need to worry about splitting
                 raw_input = []
                 for line in f:
                     if line.split()[0].find('.') > -1:
@@ -88,7 +95,7 @@ class One_Hidden:
             '''
             Also split the output into test and training, using the same random indexs
             '''
-            if(self.generalisation == "y"):
+            if self.generalisation:
                 full_doc = f.readlines()
                 training_output = []
                 test_output = []
@@ -106,7 +113,7 @@ class One_Hidden:
                         test_output.append( map(int, full_doc[i].split()) )
                 self.output = np.asarray(training_output)
                 self.test_output = np.asarray(test_output)     
-            else:
+            else:  # This isn't a generalisation set we don't need to worry about splitting
                 raw_output = []
                 for line in f:
                     if line.split()[0].find('.') > -1:
@@ -118,12 +125,12 @@ class One_Hidden:
         # Number of I/O samples (Used for population error calc)
         self.io_pairs = self.input.shape[0]
         self.total_training_population_error = 0
-        if(self.generalisation == "y"):
+        if self.generalisation:
             self.test_io_pairs = self.test_input.shape[0]
             self.total_test_population_error = 0
             self.all_solved_test_population_errors = []
 
-        # Define Parameters
+        # Parameters read from param.txt
         f = open(param_filename, "r")
         lines = f.readlines()
         self.input_layer_n = int(lines[0].rstrip('\n'))
@@ -135,20 +142,23 @@ class One_Hidden:
         
         f.close()
 
+        # Initalisation of previous values for momentum calculation
         self.prev_output_weight_change = 0
         self.prev_output_bias_change = 0
         self.prev_hidden_weight_change= 0
         self.prev_hidden_bias_change = 0
+
         # Initialize the hidden layer
         self.hidden_layer_weights = np.random.uniform(size=(self.input_layer_n, self.hidden_layer_n))
         self.hidden_layer_bias = np.random.uniform(size=(1, self.hidden_layer_n))
+        
         # Initialize the output layer
         self.output_layer_weights = np.random.uniform(size = (self.hidden_layer_n, self.output_layer_n))
         self.output_layer_bias = np.random.uniform(size=(1, self.output_layer_n))
         
+        # Define which activation functions to used from UI input
         self.hidden_action = hidden_action.strip()
         self.output_action = output_action.strip()
-        print(output_action)
         self.epochs = 0
 
 
@@ -159,7 +169,9 @@ class One_Hidden:
         for i in range(iterations):
             for e in range(epochs):
 
-                #Feed Forward
+                '''
+                Feed forward - Hidden Layer Activation
+                '''
                 hidden_layer_input = self.input.dot(self.hidden_layer_weights) + self.hidden_layer_bias
 
                 if self.hidden_action == "r": # Relu
@@ -173,6 +185,10 @@ class One_Hidden:
                 else: # Sigmoid
                     hidden_layer_activation = sigmoid_function(hidden_layer_input)
                 
+
+                '''
+                Feed forward - Output Layer Activation
+                '''
                 output_layer_input = hidden_layer_activation.dot(self.output_layer_weights) + self.output_layer_bias
 
                 if self.output_action == "n": # Sine
@@ -184,8 +200,12 @@ class One_Hidden:
                 error = self.output - self.model_output
                 population_error = 0.5 * np.sum( error**2 ) / (self.output_layer_n * self.io_pairs)
                     
-                # Backpropogate
-                if(population_error > self.error_criterion):                        
+                # We have not reached Error criterion yet
+                if population_error > self.error_criterion:  
+                    
+                    '''
+                    Backproporate - Hidden Layer Gradient
+                    '''                   
                     if self.hidden_action == "r": # Relu
                         hidden_layer_gradient = relu_derivative(hidden_layer_activation, 0)
                     elif self.hidden_action == "l": # Leaky Relu
@@ -196,7 +216,10 @@ class One_Hidden:
                         hidden_layer_gradient = cosine_function(hidden_layer_activation)
                     else: # Sigmoid
                         hidden_layer_gradient = sigmoid_derivate(hidden_layer_activation)
-                    
+
+                    '''
+                    Backproporate - Output Layer Gradient
+                    '''                       
                     if self.output_action == "n": # Sine
                         output_layer_gradient = cosine_function(self.model_output)
                     else: # Sigmoid
@@ -223,37 +246,52 @@ class One_Hidden:
                     hidden_bias_change += self.prev_hidden_bias_change * self.momentum_rate
                     self.hidden_layer_bias += hidden_bias_change
 
-                    # Remember n-1 for momentum
+                    '''
+                    Remember values for momentum in n + 1 iteration
+                    '''
                     self.prev_output_weight_change = output_weight_change
                     self.prev_output_bias_change =  output_bias_change
                     self.prev_hidden_weight_change = hidden_weight_change
                     self.prev_hidden_bias_change = hidden_bias_change
-                else:
-                    # Solution found
+                
+                
+                else: # We have reached Error criterion
+                    
                     solved = True
-                    if(iterations > 1):
+                    if iterations > 1:
                         total_solved += 1
                         total_epochs += e + 1
                         print("Solved @ %d" % e)
                         self.total_training_population_error += population_error
-                        if(self.generalisation == "y"):
+                        if self.generalisation:
                             self.test_model(bulk = True)
                     else:
                         print("Error Criterion reached at epoch: %d" % (self.epochs + e + 1)  )
                         print("Final Training Population Error was %f" % population_error)
                         self.epochs = 0 
                     break
+
+            ''' 
+            Must reset weights back to random on each iteration.
+            If this is a generalisation task we must also create a new random test/training split
+            '''
             if iterations > 1:
                 self.reset_weights()    
-                if self.generalisation == "y":
+                if self.generalisation:
                     self.reset_sample()
 
-        
-        if(iterations > 1):
+        '''
+        If this is was a bulk learning task, and we ran more than one iteration
+        We need to output the overall averages of the bulk task.
+
+        If the task is a generalisation task we also output the standard deviation
+        across all of the iterations.
+        '''
+        if iterations > 1:
             print("\nTotal Solved: %d, average epochs to find solution: %d" % (total_solved, total_epochs/total_solved))
             print("Average Training Error")
             print(self.total_training_population_error / total_solved)
-            if(self.generalisation == "y"):
+            if self.generalisation:
                 print("Average Test Error")
                 average_population_error = self.total_test_population_error / total_solved
                 print(average_population_error)
@@ -267,11 +305,7 @@ class One_Hidden:
 
         elif not solved:
             self.epochs += epochs
-            print("Not solved over %d epochs" % epochs)
-        
-            
-
-        
+            print("Not solved over %d epochs" % epochs) 
                         
     def print_weights(self):
         print("\nHidden Layer Weights")
@@ -298,9 +332,6 @@ class One_Hidden:
         # Initialize the output layer
         self.output_layer_weights = np.random.uniform(size = (self.hidden_layer_n, self.output_layer_n))
         self.output_layer_bias = np.random.uniform(size=(1, self.output_layer_n))
-
-
-
 
     ''' 
     Called from the bulk training function to resample the input into different traning/test sets for
@@ -347,10 +378,11 @@ class One_Hidden:
                 self.output = np.asarray(training_output)
                 self.test_output = np.asarray(test_output)
 
-
     def test_model(self, bulk = False):
-        hidden_layer_input = self.test_input.dot(self.hidden_layer_weights) + self.hidden_layer_bias
-        
+        hidden_layer_input = self.test_input.dot(self.hidden_layer_weights) + self.hidden_layer_bias   
+        '''
+        Feed forward - Hidden Layer Activation
+        '''
         if self.hidden_action == "r": # Relu
             hidden_layer_activation = relu_function(hidden_layer_input, 0)
         elif self.hidden_action == "l": # Leaky Relu
@@ -361,7 +393,9 @@ class One_Hidden:
             hidden_layer_activation = sine_function(hidden_layer_input)    
         else: # Sigmoid
             hidden_layer_activation = sigmoid_function(hidden_layer_input)
-        
+        '''
+        Feed forward - Output Layer Activation
+        '''        
         output_layer_input = hidden_layer_activation.dot(self.output_layer_weights) + self.output_layer_bias
         if self.output_action == "n": # Sine
             test_model_output =  sine_function(output_layer_input)   
@@ -372,17 +406,19 @@ class One_Hidden:
         error = self.test_output - test_model_output
         population_error = 0.5 * np.sum( error**2 ) / (self.output_layer_n * self.test_io_pairs)
         self.total_test_population_error += population_error
-        if(not bulk):
+        if not bulk:
             print("Model Output")
             print(test_model_output)
-        
+
         print("Test Population Error")
         print(population_error)
-
         self.all_solved_test_population_errors.append(population_error)
-        
-
-
+    
+'''
+The Actual running of the application. 
+Where we provide the UI from, and where we initalize the One_Hidden object
+based on user input
+'''
 if __name__== "__main__":
     folder = raw_input("Please input the model/folder you want to run from. Leave blank for current folder\n")
     hidden_activation = raw_input("\nPlease choose the hidden layer activation function\n"
@@ -394,14 +430,17 @@ if __name__== "__main__":
     output_activation = raw_input("\nPlease choose the output layer activation function\n"
     "s: Sigmoid (This)\n"
     "n: Sine\n\n")
-
     generalisation = raw_input("\nDoes this model need to generalise (80:20 Training:Test)\n"
     "y\nn\n\n")
+    if generalisation == "y":
+        generalisation = True
+    else:
+        generalisation = False
     one_h = One_Hidden(folder, hidden_activation, output_activation, generalisation)
 
     print("\nModel Initalised")
     option = 10
-    while(option != "0"):
+    while option != "0":
         try:
             option = raw_input(
                 "\nPlease choose option\n" 
@@ -414,38 +453,38 @@ if __name__== "__main__":
                 "7: bulk iterations\n"
                 "0: Quit\n\n"
             )
-            if(option == "0"):
-                print ("Thanks for playing!")
+            if option == "0":
+                print ("Thanks for learning!")
                 break
             
-            if(option == "1"):
+            if option == "1":
                 one_h.learn(iterations = 1, epochs = 100)
             
-            if(option == "2"):
+            if option == "2":
                 one_h.learn(iterations = 1, epochs = 5000)
             
-            if(option == "3"):
-                if(folder == "6_iris"):
+            if option == "3":
+                if folder == "6_iris":
                     one_h.test_model()
                 else:
                     print("Can only test generalisation on Iris dataset")
             
-            if(option == "4"):
+            if option == "4":
                 one_h.print_weights()
             
-            if(option == "5"):
+            if option == "5":
                 one_h.print_model_output()
             
-            if(option == "6"):
+            if option == "6":
                 one_h.reset_weights()
 
-            if(option == "7"):
+            if option == "7":
                 try:
                     in_iterations = raw_input("\nhow Many iterations? Leave blank for default of 1000\n");
                 except ValueError:
                     in_iterations = 1000
                 else:
-                    if(in_iterations == ''):
+                    if in_iterations == '':
                         in_iterations = 1000
                     else:
                         in_iterations = int(in_iterations)
@@ -454,12 +493,12 @@ if __name__== "__main__":
                 except ValueError:
                     in_epochs = 5000
                 else:
-                    if(in_epochs == ''):
+                    if in_epochs == '':
                         in_epochs = 5000
                     else:
                         in_epochs = int(in_epochs)    
                 one_h.learn(iterations =  in_iterations, epochs = in_epochs)
                 
         except EOFError:
-            print ("Thanks for playing!")
+            print ("Thanks for learning!")
             break
